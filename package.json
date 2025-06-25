@@ -1,0 +1,35 @@
+{
+  "name": "social-scraper",
+  "version": "1.0.0",
+  "description": "소셜 미디어 인플루언서 데이터 수집 시스템",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js",
+    "test": "node scripts/test_system.js",
+    "test:instagram": "node scripts/test_instagram.js",
+    "test:tiktok": "node scripts/test_tiktok.js",
+    "test:tiktok:user": "node scripts/test_tiktok.js",
+    "profile:instagram": "node instagram/instagram_profile_scraper.js",
+    "post:instagram": "node instagram/instagram_post_scraper.js",
+    "profile:tiktok": "node tiktok/tiktok_profile_scraper.js",
+    "post:tiktok": "node tiktok/tiktok_post_scraper.js"
+  },
+  "keywords": [
+    "scraper",
+    "instagram",
+    "tiktok",
+    "social-media",
+    "influencer",
+    "puppeteer"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=16.0.0"
+  }
+} 
