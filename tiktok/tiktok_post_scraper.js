@@ -396,4 +396,44 @@ class TikTokPostScraper {
 
 module.exports = TikTokPostScraper;
 
+// 메인 실행 로직 (파일이 직접 실행될 때만)
+if (require.main === module) {
+  async function main() {
+    const scraper = new TikTokPostScraper();
+    
+    try {
+      // 스크래퍼 초기화
+      const initialized = await scraper.initialize();
+      if (!initialized) {
+        console.error('스크래퍼 초기화 실패');
+        return;
+      }
+      
+      const testPostUrl = 'https://www.tiktok.com/@bts_official_bighit/video/7517612334962052360';
+      
+      const postData = await scraper.scrapePost(testPostUrl);
+      
+      if (postData) {
+        console.log('스크래핑 결과:');
+        console.log(JSON.stringify(postData, null, 2));
+        
+        // 결과를 파일로 저장
+        const fs = require('fs');
+        const timestamp = Date.now();
+        const filename = `output/tiktok_post_${timestamp}.json`;
+        fs.writeFileSync(filename, JSON.stringify(postData, null, 2));
+        console.log(`결과를 ${filename}에 저장했습니다.`);
+      }
+      
+    } catch (error) {
+      console.error('스크래핑 중 오류 발생:', error.message);
+    } finally {
+      // 브라우저 종료
+      await scraper.close();
+    }
+  }
+  
+  main().catch(console.error);
+}
+
  

@@ -25,11 +25,12 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "dotenv": "^16.5.0",
+    "pg": "^8.16.2",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2"
   },
-  "devDependencies": {},
   "engines": {
     "node": ">=16.0.0"
   }
-} 
+}
