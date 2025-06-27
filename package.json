@@ -9,10 +9,13 @@
     "test:instagram": "node scripts/test_instagram.js",
     "test:tiktok": "node scripts/test_tiktok.js",
     "test:tiktok:user": "node scripts/test_tiktok.js",
+    "test:tiktok:comments": "node tiktok/tiktok_comment_scraper.js",
+    "test:simple:comments": "node tiktok/simple_comment_scraper.js",
     "profile:instagram": "node instagram/instagram_profile_scraper.js",
     "post:instagram": "node instagram/instagram_post_scraper.js",
     "profile:tiktok": "node tiktok/tiktok_profile_scraper.js",
-    "post:tiktok": "node tiktok/tiktok_post_scraper.js"
+    "post:tiktok": "node tiktok/tiktok_post_scraper.js",
+    "comments:tiktok": "node tiktok/tiktok_comment_scraper.js"
   },
   "keywords": [
     "scraper",

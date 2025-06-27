@@ -409,7 +409,7 @@ if (require.main === module) {
         return;
       }
       
-      const testPostUrl = 'https://www.tiktok.com/@bts_official_bighit/video/7517612334962052360';
+      const testPostUrl = 'https://www.tiktok.com/@changbi_book/video/7517208183597763858';
       
       const postData = await scraper.scrapePost(testPostUrl);
       
