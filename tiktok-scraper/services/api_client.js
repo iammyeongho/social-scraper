@@ -35,17 +35,13 @@ class ApiClient {
         console.log(`${response.data.length}개의 인플루언서 ID를 받았습니다.`);
         return response.data;
       } else {
-        // 더미 데이터 반환 (개발/테스트용)
-        const dummyInfluencerIds = [
-          'tiktok_user_12345',
-          'tiktok_user_67890',
-          'tiktok_user_11111',
-          'tiktok_user_22222',
-          'tiktok_user_33333'
+        // 테스트용 실제 인플루언서 아이디 (공개 계정들)
+        const testInfluencerIds = [
+          'y_ssuh_',
         ];
 
-        console.log(`${dummyInfluencerIds.length}개의 TikTok 인플루언서 ID를 받았습니다. (더미 데이터)`);
-        return dummyInfluencerIds;
+        console.log(`${testInfluencerIds.length}개의 TikTok 인플루언서 ID를 받았습니다. (테스트 데이터)`);
+        return testInfluencerIds;
       }
 
     } catch (error) {

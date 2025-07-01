@@ -182,7 +182,7 @@ class DatabaseService {
       const result = await client.query(insertSQL, values);
       const profileId = result.rows[0].id;
       
-      console.log(`✓ 프로필 저장 완료: ${profileData.username} (ID: ${profileId})`);
+      console.log(`프로필 저장 완료: ${profileData.username} (ID: ${profileId})`);
       return profileId;
 
     } catch (error) {

@@ -3,9 +3,9 @@
  */
 module.exports = {
   // 브라우저 설정
-  headless: false, // 디버깅을 위해 false로 설정
-  timeout: 30000,
-  pageLoadDelay: 2000,
+  headless: false, // 디버깅을 위해 false로 변경
+  timeout: 60000, // 타임아웃을 60초로 증가
+  pageLoadDelay: 5000, // 페이지 로딩 대기시간 증가
   
   // 뷰포트 설정 (데스크톱 - 프로필용)
   viewport: {
@@ -42,7 +42,7 @@ module.exports = {
   
   // 스크롤 설정
   scroll: {
-    maxPosts: 100, // 최대 수집할 게시물 수
+    maxPosts: 10, // 최대 수집할 게시물 수 (scraping.maxPostsPerProfile과 일치)
     maxScrollAttempts: 300, // 최대 스크롤 시도 횟수 (더 증가)
     scrollStep: 800, // 한 번에 스크롤할 픽셀 수
     delay: 2500, // 스크롤 간 대기 시간 (밀리초) - 증가
@@ -134,10 +134,28 @@ module.exports = {
     }
   },
   
+  // 스크래핑 설정
+  scraping: {
+    enableProfileScraping: true, // 프로필 스크래핑 활성화
+    enablePostDetailScraping: false, // 게시물 상세 스크래핑 비활성화 (빠른 테스트용)
+    enableCommentScraping: true, // 댓글 스트림 스크래핑 활성화 (테스트용)
+    enableFollowerScraping: false, // 팔로워 스크래핑 비활성화 (빠른 테스트용)
+    
+    // 수집 제한
+    maxPostsPerProfile: 10, // 프로필당 최대 게시물 수
+    maxDetailedPosts: 10, // 상세 스크래핑할 게시물 수
+    maxCommentsPerPost: 100, // 게시물당 최대 댓글 수 (테스트용으로 감소)
+    maxFollowersPerProfile: 50, // 프로필당 최대 팔로워 수 (테스트용으로 감소)
+    maxCommentPosts: 1 // 댓글을 수집할 게시물 수 (테스트용으로 1개)
+  },
+
+  // 요청 딜레이 설정
+  requestDelay: 3000, // 요청 간 대기 시간 (밀리초)
+  
   // 옵션 설정
   options: {
     enableLogging: true, // 상세 로깅 활성화
-    saveScreenshots: true, // 스크린샷 저장 활성화
+    saveScreenshots: false, // 스크린샷 저장 비활성화
     retryOnError: true, // 오류 시 재시도
     maxRetries: 3 // 최대 재시도 횟수
   }

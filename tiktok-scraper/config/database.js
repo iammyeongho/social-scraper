@@ -4,7 +4,7 @@ module.exports = {
   postgres: {
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 5432,
-    database: process.env.DB_NAME || 'tiktok_scraper',
+    database: process.env.DB_NAME || 'social_scraper',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || '',
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,

@@ -32,7 +32,25 @@ class TikTokProfileScraper {
           '--no-zygote',
           '--disable-gpu',
           `--window-size=${config.windowSize.width},${config.windowSize.height}`,
-          '--lang=ko-KR,ko'
+          '--lang=ko-KR,ko',
+          '--disable-blink-features=AutomationControlled',
+          '--disable-features=VizDisplayCompositor',
+          '--disable-web-security',
+          '--disable-features=TranslateUI',
+          '--disable-ipc-flooding-protection',
+          '--no-default-browser-check',
+          '--no-first-run',
+          '--disable-default-apps',
+          '--disable-popup-blocking',
+          '--disable-prompt-on-repost',
+          '--disable-hang-monitor',
+          '--disable-sync',
+          '--disable-background-timer-throttling',
+          '--disable-renderer-backgrounding',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-client-side-phishing-detection',
+          '--disable-component-extensions-with-background-pages',
+          '--allow-running-insecure-content'
         ]
       });
 
@@ -77,31 +95,32 @@ class TikTokProfileScraper {
       // 프로필 정보 수집
       const profileData = await this.extractProfileInfo(username);
       
-      // 스크롤을 통해 게시물 URL 목록 수집
-      const postUrls = await this.scrollAndExtractPostUrls();
+      // 스크롤을 통해 게시물 정보 수집 (URL + 조회수)
+      const postData = await this.scrollAndExtractPostUrls();
 
       console.log(`✓ 프로필 스크래핑 완료: @${username}`);
       console.log(`  - 팔로워: ${profileData.followers_count}`);
       console.log(`  - 팔로잉: ${profileData.following_count}`);
       console.log(`  - 게시물: ${profileData.video_count}`);
-      console.log(`  - 수집된 게시물 URL: ${postUrls.length}개`);
+      console.log(`  - 수집된 게시물: ${postData.length}개`);
+      if (postData.length > 0) {
+        const totalViews = postData.reduce((sum, post) => sum + post.viewCount, 0);
+        console.log(`  - 총 조회수: ${totalViews.toLocaleString()}회`);
+        console.log(`  - 평균 조회수: ${Math.round(totalViews / postData.length).toLocaleString()}회`);
+      }
       console.log(`  - 비즈니스 계정: ${profileData.is_verified ? '예' : '아니오'}`);
 
       return {
         ...profileData,
-        post_urls: postUrls
+        post_urls: postData.map(post => post.url), // URL만 추출한 배열
+        post_data: postData, // URL + 조회수 정보 전체
+        total_views_from_posts: postData.reduce((sum, post) => sum + post.viewCount, 0)
       };
 
     } catch (error) {
       console.error(`틱톡 프로필 스크래핑 오류 (@${username}):`, error.message);
       
-      // 오류 시 스크린샷 저장
-      if (this.page) {
-        await this.page.screenshot({ 
-          path: `error_tiktok_profile_${username}_${Date.now()}.png`,
-          fullPage: true 
-        });
-      }
+      // 오류 시 스크린샷 저장 - 제거됨
       
       return null;
     }
@@ -113,48 +132,76 @@ class TikTokProfileScraper {
    */
   async scrollAndExtractPostUrls() {
     try {
-      console.log('게시물 URL 수집을 위한 스크롤 시작...');
-      console.log(`목표: ${config.scroll.maxPosts}개 게시물, 스크롤 스텝: ${config.scroll.scrollStep}px, 딜레이: ${config.scroll.delay}ms`);
+      console.log('게시물 정보 수집을 위한 스크롤 시작...');
       
-      let allUrls = [];
+      // 스크래핑 설정의 maxPostsPerProfile을 우선 사용 (더 구체적인 설정)
+      const maxPosts = config.scraping?.maxPostsPerProfile || config.scroll.maxPosts;
+      console.log(`목표: ${maxPosts}개 게시물 (설정: scraping.maxPostsPerProfile=${config.scraping?.maxPostsPerProfile}, scroll.maxPosts=${config.scroll.maxPosts})`);
+      console.log(`스크롤 스텝: ${config.scroll.scrollStep}px, 딜레이: ${config.scroll.delay}ms`);
+      
+      let allPosts = [];
       let scrollAttempts = 0;
       let consecutiveNoNewPosts = 0;
       let consecutiveNoScroll = 0;
-      let lastUrlCount = 0;
+      let lastPostCount = 0;
       let stuckCount = 0;
       const maxConsecutiveNoNewPosts = 20; // 연속 20번 새 게시물이 없으면 중단 (증가)
       const maxConsecutiveNoScroll = 10; // 연속 10번 스크롤이 안되면 중단 (증가)
-      const maxStuckCount = 5; // 연속 5번 URL 수가 같으면 강제 스크롤
+      const maxStuckCount = 5; // 연속 5번 게시물 수가 같으면 강제 스크롤
       
-      while (scrollAttempts < config.scroll.maxScrollAttempts && allUrls.length < config.scroll.maxPosts) {
-        // 현재 페이지의 게시물 URL 추출
-        const currentUrls = await this.extractCurrentPagePostUrls();
-        const previousCount = allUrls.length;
-        allUrls = [...new Set([...allUrls, ...currentUrls])];
-        const newPostsCount = allUrls.length - previousCount;
+      while (scrollAttempts < config.scroll.maxScrollAttempts && allPosts.length < maxPosts) {
+        // 현재 페이지의 게시물 정보 추출 (URL + 조회수)
+        const currentPosts = await this.extractCurrentPagePostUrls();
+        const previousCount = allPosts.length;
         
-        console.log(`스크롤 ${scrollAttempts + 1}/${config.scroll.maxScrollAttempts}: ${allUrls.length}개 게시물 (새로 발견: ${newPostsCount}개)`);
+        // 새로운 게시물들을 기존 배열에 추가 (중복 제거)
+        currentPosts.forEach(post => {
+          if (!allPosts.find(p => p.url === post.url)) {
+            allPosts.push(post);
+          }
+        });
+        
+        const newPostsCount = allPosts.length - previousCount;
+        
+        console.log(`스크롤 ${scrollAttempts + 1}/${config.scroll.maxScrollAttempts}: ${allPosts.length}/${maxPosts}개 게시물 (새로 발견: ${newPostsCount}개)`);
+        
+        // 새로운 게시물이 있으면 조회수 정보 표시
+        if (newPostsCount > 0) {
+          const newPosts = allPosts.slice(previousCount);
+          newPosts.slice(0, 3).forEach((post, index) => { // 최대 3개만 표시
+            console.log(`  🎬 새 게시물 ${index + 1}: ${post.rawViewCount} 조회수`);
+          });
+          if (newPosts.length > 3) {
+            console.log(`  📋 그 외 ${newPosts.length - 3}개 게시물 더 발견됨`);
+          }
+        }
+        
+        // 진행률 표시
+        if (maxPosts > 0) {
+          const progress = Math.round((allPosts.length / maxPosts) * 100);
+          console.log(`  📊 진행률: ${progress}% (${allPosts.length}/${maxPosts})`);
+        }
         
         // 목표 게시물 수에 도달했는지 확인
-        if (allUrls.length >= config.scroll.maxPosts) {
-          console.log(`목표 게시물 수(${config.scroll.maxPosts}개)에 도달했습니다.`);
+        if (allPosts.length >= maxPosts) {
+          console.log(`목표 게시물 수(${maxPosts}개)에 도달했습니다.`);
           break;
         }
         
-        // URL 수가 변하지 않았는지 확인
-        if (allUrls.length === lastUrlCount) {
+        // 게시물 수가 변하지 않았는지 확인
+        if (allPosts.length === lastPostCount) {
           stuckCount++;
-          console.log(`URL 수가 변하지 않았습니다. (연속 ${stuckCount}/${maxStuckCount})`);
+          console.log(`게시물 수가 변하지 않았습니다. (연속 ${stuckCount}/${maxStuckCount})`);
           
           if (stuckCount >= maxStuckCount) {
-            console.log('URL 수가 멈춘 상태입니다. 강제 스크롤을 시도합니다...');
+            console.log('게시물 수가 멈춘 상태입니다. 강제 스크롤을 시도합니다...');
             await this.forceScroll();
             stuckCount = 0; // 카운터 리셋
           }
         } else {
-          stuckCount = 0; // URL 수가 변하면 카운터 리셋
+          stuckCount = 0; // 게시물 수가 변하면 카운터 리셋
         }
-        lastUrlCount = allUrls.length;
+        lastPostCount = allPosts.length;
         
         // 스크롤 실행 (여러 방법 시도)
         let scrolled = false;
@@ -208,20 +255,27 @@ class TikTokProfileScraper {
         scrollAttempts++;
         
         // 중간에 스크린샷 저장 (디버깅용)
-        if (scrollAttempts % 5 === 0) { // 더 자주 스크린샷 저장
-          await this.page.screenshot({ 
-            path: `scroll_debug_${scrollAttempts}_${Date.now()}.png`,
-            fullPage: true 
-          });
-          console.log(`디버깅 스크린샷 저장: scroll_${scrollAttempts}`);
-        }
+        // 스크롤 디버깅 스크린샷 제거됨
       }
       
       // 최대 게시물 수로 제한
-      const limitedUrls = allUrls.slice(0, config.scroll.maxPosts);
-      console.log(`총 ${limitedUrls.length}개의 게시물 URL을 수집했습니다.`);
+      const limitedPosts = allPosts.slice(0, maxPosts);
       
-      return limitedUrls;
+      console.log(`\n📊 게시물 수집 완료 요약:`);
+      console.log(`  - 목표: ${maxPosts}개 게시물`);
+      console.log(`  - 실제 수집: ${limitedPosts.length}개 게시물`);
+      console.log(`  - 달성률: ${Math.round((limitedPosts.length / maxPosts) * 100)}%`);
+      
+      if (limitedPosts.length > 0) {
+        const totalViews = limitedPosts.reduce((sum, post) => sum + post.viewCount, 0);
+        const avgViews = Math.round(totalViews / limitedPosts.length);
+        console.log(`  - 총 조회수: ${totalViews.toLocaleString()}회`);
+        console.log(`  - 평균 조회수: ${avgViews.toLocaleString()}회`);
+        console.log(`  - 최고 조회수: ${Math.max(...limitedPosts.map(p => p.viewCount)).toLocaleString()}회`);
+        console.log(`  - 최저 조회수: ${Math.min(...limitedPosts.map(p => p.viewCount)).toLocaleString()}회`);
+      }
+      
+      return limitedPosts;
       
     } catch (error) {
       console.error('스크롤 및 게시물 URL 추출 오류:', error.message);
@@ -258,66 +312,115 @@ class TikTokProfileScraper {
   }
 
   /**
-   * 현재 페이지의 게시물 URL 추출
-   * @returns {Promise<Array>} 현재 페이지의 게시물 URL 배열
+   * 현재 페이지의 게시물 URL과 조회수 정보 추출
+   * @returns {Promise<Array>} 현재 페이지의 게시물 정보 배열 {url, viewCount, rawViewCount}
    */
   async extractCurrentPagePostUrls() {
     try {
-      const postUrls = await this.page.evaluate((selectors) => {
-        const urls = [];
+      const postData = await this.page.evaluate((selectors) => {
+        const posts = [];
         
-        // 방법 1: a 태그에서 href 추출 (가장 일반적)
-        const postLinkElements = document.querySelectorAll('a[href*="/video/"]');
-        postLinkElements.forEach(element => {
-          const href = element.getAttribute('href');
-          if (href && href.includes('/video/') && !href.includes('#')) {
-            // 상대 URL을 절대 URL로 변환
+        // 숫자 정규화 함수 (15.6K -> 15600)
+        const normalizeViewCount = (text) => {
+          if (!text) return 0;
+          
+          const cleanText = text.trim().toLowerCase();
+          let multiplier = 1;
+          
+          if (cleanText.includes('k')) {
+            multiplier = 1000;
+          } else if (cleanText.includes('m')) {
+            multiplier = 1000000;
+          } else if (cleanText.includes('b')) {
+            multiplier = 1000000000;
+          }
+          
+          const number = parseFloat(cleanText.replace(/[^0-9.]/g, ''));
+          return isNaN(number) ? 0 : Math.round(number * multiplier);
+        };
+        
+        // 방법 1: 게시물 컨테이너에서 URL과 조회수 함께 추출
+        const postContainers = document.querySelectorAll('div[class*="DivWrapper"] a[href*="/video/"]');
+        postContainers.forEach(linkElement => {
+          try {
+            const href = linkElement.getAttribute('href');
+            if (!href || !href.includes('/video/') || href.includes('#')) return;
+            
             const fullUrl = href.startsWith('http') ? href : `https://www.tiktok.com${href}`;
-            urls.push(fullUrl);
+            
+            // 같은 컨테이너 내에서 조회수 찾기
+            const container = linkElement.closest('div[class*="DivWrapper"]') || linkElement.parentElement;
+            const viewElement = container ? container.querySelector('strong[data-e2e="video-views"]') : null;
+            const rawViewCount = viewElement ? viewElement.textContent.trim() : '0';
+            const normalizedViewCount = normalizeViewCount(rawViewCount);
+            
+            posts.push({
+              url: fullUrl,
+              viewCount: normalizedViewCount,
+              rawViewCount: rawViewCount
+            });
+            
+          } catch (e) {
+            console.log('개별 게시물 처리 오류:', e);
           }
         });
         
-        // 방법 2: 더 구체적인 선택자로 시도
-        const videoLinks = document.querySelectorAll('[data-e2e="user-post-item"] a');
-        videoLinks.forEach(element => {
-          const href = element.getAttribute('href');
-          if (href && href.includes('/video/')) {
+        // 방법 2: 전체 a 태그에서 비디오 링크 찾기 (조회수 정보 없어도 수집)
+        const allVideoLinks = document.querySelectorAll('a[href*="/video/"]');
+        allVideoLinks.forEach(linkElement => {
+          try {
+            const href = linkElement.getAttribute('href');
+            if (!href || !href.includes('/video/') || href.includes('#')) return;
+            
             const fullUrl = href.startsWith('http') ? href : `https://www.tiktok.com${href}`;
-            urls.push(fullUrl);
+            
+            // 이미 추가된 URL인지 확인
+            if (posts.find(p => p.url === fullUrl)) return;
+            
+            // 부모 요소에서 조회수 찾기 시도
+            let viewElement = linkElement.querySelector('strong[data-e2e="video-views"]');
+            if (!viewElement) {
+              const parent = linkElement.closest('div');
+              viewElement = parent ? parent.querySelector('strong[data-e2e="video-views"]') : null;
+            }
+            
+            const rawViewCount = viewElement ? viewElement.textContent.trim() : '0';
+            const normalizedViewCount = normalizeViewCount(rawViewCount);
+            
+            posts.push({
+              url: fullUrl,
+              viewCount: normalizedViewCount,
+              rawViewCount: rawViewCount
+            });
+            
+          } catch (e) {
+            console.log('개별 게시물 처리 오류:', e);
           }
         });
         
-        // 방법 3: 모든 링크에서 비디오 URL 찾기
-        const allLinks = document.querySelectorAll('a');
-        allLinks.forEach(element => {
-          const href = element.getAttribute('href');
-          if (href && href.includes('/video/') && !href.includes('#')) {
-            const fullUrl = href.startsWith('http') ? href : `https://www.tiktok.com${href}`;
-            urls.push(fullUrl);
+        // 중복 제거 (URL 기준)
+        const uniquePosts = [];
+        const seenUrls = new Set();
+        
+        posts.forEach(post => {
+          if (!seenUrls.has(post.url)) {
+            seenUrls.add(post.url);
+            uniquePosts.push(post);
           }
         });
         
-        // 방법 4: data-e2e 속성을 가진 모든 링크 확인
-        const dataE2ELinks = document.querySelectorAll('[data-e2e] a');
-        dataE2ELinks.forEach(element => {
-          const href = element.getAttribute('href');
-          if (href && href.includes('/video/') && !href.includes('#')) {
-            const fullUrl = href.startsWith('http') ? href : `https://www.tiktok.com${href}`;
-            urls.push(fullUrl);
-          }
+        console.log(`현재 페이지에서 ${uniquePosts.length}개의 비디오 발견`);
+        uniquePosts.forEach((post, index) => {
+          console.log(`  ${index + 1}. 조회수: ${post.rawViewCount} (${post.viewCount}) - ${post.url.split('/').pop()}`);
         });
         
-        // 중복 제거 및 정렬
-        const uniqueUrls = [...new Set(urls)];
-        console.log(`현재 페이지에서 ${uniqueUrls.length}개의 비디오 링크 발견`);
-        
-        return uniqueUrls;
+        return uniquePosts;
       }, config.selectors);
 
-      return postUrls;
+      return postData;
 
     } catch (error) {
-      console.error('현재 페이지 게시물 URL 추출 오류:', error.message);
+      console.error('현재 페이지 게시물 정보 추출 오류:', error.message);
       return [];
     }
   }

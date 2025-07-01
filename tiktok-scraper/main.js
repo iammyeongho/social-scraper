@@ -13,6 +13,9 @@ class TikTokScrapingSystem {
     this.apiClient = new ApiClient(config.api.influencerApi);
     this.databaseService = new DatabaseService(config.database);
     this.tiktokScraper = new TikTokScraper();
+    
+    // 스트림 처리를 위해 데이터베이스 서비스 주입
+    this.tiktokScraper.setDatabaseService(this.databaseService);
   }
 
   /**
@@ -32,6 +35,10 @@ class TikTokScrapingSystem {
       // 2. 데이터베이스 연결
       await this.databaseService.connect();
       console.log('✓ TikTok 데이터베이스 연결 성공');
+      
+      // 3. 데이터베이스 상태 확인
+      const dbStatus = await this.databaseService.getStatus();
+      console.log('📊 데이터베이스 상태:', dbStatus);
 
       console.log('=== TikTok 시스템 초기화 완료 ===\n');
       return true;
@@ -50,35 +57,102 @@ class TikTokScrapingSystem {
       console.log('=== TikTok 스크래핑 프로세스 시작 ===');
 
       // 1. 서드파티 API에서 TikTok 인플루언서 ID 목록 받아오기
+      console.log('🔄 1단계: 인플루언서 ID 목록 요청...');
       const influencerIds = await this.apiClient.getInfluencerIds();
       
+      console.log(`📋 받아온 인플루언서 ID: ${JSON.stringify(influencerIds)}`);
+      
       if (!influencerIds || influencerIds.length === 0) {
-        console.log('처리할 TikTok 인플루언서가 없습니다.');
+        console.log('❌ 처리할 TikTok 인플루언서가 없습니다.');
         return;
       }
+      
+      console.log(`✅ ${influencerIds.length}개의 TikTok 인플루언서 ID를 받았습니다.`);
 
       // 2. 인플루언서 ID를 스크래핑 큐에 추가
+      console.log('🔄 2단계: 스크래핑 큐에 추가...');
       this.tiktokScraper.addInfluencersToQueue(influencerIds);
+      console.log('✅ 스크래핑 큐 추가 완료');
 
       // 3. 순차적으로 인플루언서 스크래핑 및 데이터 저장
+      console.log('🔄 3단계: 인플루언서 스크래핑 실행...');
       const results = await this.tiktokScraper.processAllInfluencers();
+      
+      console.log(`📊 스크래핑 결과: ${results ? results.length : 0}개`);
       
       if (!results || results.length === 0) {
         console.log('TikTok 스크래핑 결과가 없습니다.');
         return;
       }
+      
+      // 스크래핑 결과 요약 출력
+      console.log('\n=== 스크래핑 결과 요약 ===');
+      results.forEach((result, index) => {
+        console.log(`${index + 1}. @${result.profile?.username || result.profile?.api_influencer_id}:`);
+        console.log(`   - 프로필: ${result.profile ? '✅' : '❌'}`);
+        console.log(`   - 게시물: ${result.posts?.length || 0}개`);
+        console.log(`   - 상세 게시물: ${result.detailed_posts?.length || 0}개`);
+        console.log(`   - 팔로워: ${result.followers?.followers?.length || 0}명`);
+        console.log(`   - 댓글: ${result.comments?.length || 0}개 게시물`);
+      });
 
-      // 4. 스크래핑 결과를 데이터베이스에 저장
-      console.log('\n=== TikTok 데이터베이스 저장 시작 ===');
+      // 4. 스크래핑 결과 분석 (스트림 처리 vs 배치 처리)
+      console.log('\n4단계: 스크래핑 결과 분석...');
       const saveResults = [];
       
       for (const result of results) {
         try {
-          const saveResult = await this.databaseService.saveInfluencerData(result);
-          saveResults.push(saveResult);
-          console.log(`✓ TikTok 인플루언서 데이터 저장 완료: ${result.profile.api_influencer_id}`);
+          console.log(`\n처리 결과 분석: ${result.profile.api_influencer_id}`);
+          
+          if (result.streamProcessed) {
+            // ✅ 스트림 처리된 결과 - 이미 저장 완료
+            console.log(`🔄 스트림 처리 완료됨:`);
+            console.log(`  - 프로필 ID: ${result.profileId}`);
+            console.log(`  - 저장된 게시물: ${result.savedPosts}/${result.totalPosts}개`);
+            console.log(`  - 상세 정보 업데이트: ${result.detailedPosts || 0}개`);
+            console.log(`  - 저장된 댓글: ${result.savedComments || 0}개 게시물`);
+            
+            saveResults.push({
+              profileId: result.profileId,
+              savedPosts: result.savedPosts,
+              totalPosts: result.totalPosts,
+              detailedPosts: result.detailedPosts || 0,
+              savedComments: result.savedComments || 0,
+              streamProcessed: true
+            });
+            
+            console.log(`✅ 스트림 처리 결과 확인 완료: ${result.profile.api_influencer_id}`);
+            
+          } else if (result.legacyProcessed) {
+            // ❌ 기존 배치 처리된 결과 - 별도 저장 필요
+            console.log(`📦 배치 처리 결과 - 별도 저장 시작:`);
+            console.log(`  - 프로필: ✓`);
+            console.log(`  - 게시물: ${result.posts?.length || 0}개`);
+            console.log(`  - 팔로워: ${result.followers?.followers?.length || 0}명`);
+            console.log(`  - 상세 게시물: ${result.detailed_posts?.length || 0}개`);
+            console.log(`  - 댓글: ${result.comments?.length || 0}개 게시물`);
+            
+            // 기존 배치 처리 저장 로직
+            const saveResult = await this.databaseService.saveInfluencerData(result);
+            console.log(`프로필 저장 완료: profileId=${saveResult.profileId}, 게시물=${saveResult.savedPosts}/${saveResult.totalPosts}개`);
+            
+            // 팔로워 데이터 저장
+            if (result.followers && result.followers.followers && result.followers.followers.length > 0) {
+              console.log(` 팔로워 데이터 저장 중: ${result.followers.followers.length}명`);
+              const savedFollowers = await this.databaseService.saveFollowersData(saveResult.profileId, result.followers);
+              console.log(`팔로워 저장 완료: ${savedFollowers}명`);
+            }
+            
+            saveResults.push(saveResult);
+            console.log(`✅ 배치 처리 저장 완료: ${result.profile.api_influencer_id}`);
+            
+          } else {
+            console.log(`⚠️ 알 수 없는 처리 방식: ${result.profile.api_influencer_id}`);
+          }
+          
         } catch (error) {
-          console.error(`✗ TikTok 인플루언서 데이터 저장 실패: ${result.profile.api_influencer_id}`, error.message);
+          console.error(`💥 결과 처리 실패: ${result.profile.api_influencer_id}`);
+          console.error(`오류 상세:`, error.message);
         }
       }
 
@@ -124,9 +198,25 @@ class TikTokScrapingSystem {
     
     let totalPosts = 0;
     let totalSavedPosts = 0;
+    let totalFollowers = 0;
+    let totalDetailedPosts = 0;
+    let totalComments = 0;
+    let totalCommentsCollected = 0;
     
     scrapingResults.forEach(result => {
       totalPosts += result.posts.length;
+      if (result.followers && result.followers.followers) {
+        totalFollowers += result.followers.followers.length;
+      }
+      if (result.detailed_posts) {
+        totalDetailedPosts += result.detailed_posts.length;
+      }
+      if (result.comments) {
+        totalComments += result.comments.length;
+        result.comments.forEach(commentData => {
+          totalCommentsCollected += commentData.total || 0;
+        });
+      }
     });
     
     saveResults.forEach(result => {
@@ -135,6 +225,10 @@ class TikTokScrapingSystem {
     
     console.log(`총 수집된 TikTok 게시물: ${totalPosts}개`);
     console.log(`성공적으로 저장된 TikTok 게시물: ${totalSavedPosts}개`);
+    console.log(`총 수집된 TikTok 팔로워: ${totalFollowers}명`);
+    console.log(`상세 정보 수집된 TikTok 게시물: ${totalDetailedPosts}개`);
+    console.log(`댓글 수집된 TikTok 게시물: ${totalComments}개`);
+    console.log(`총 수집된 TikTok 댓글: ${totalCommentsCollected}개`);
     console.log('=== TikTok 프로세스 완료 ===\n');
   }
 

@@ -91,14 +91,7 @@ class TikTokPostScraper {
     } catch (error) {
       console.error(`틱톡 게시물 스크래핑 오류 (${postUrl}):`, error.message);
       
-      // 오류 시 스크린샷 저장
-      if (this.page) {
-        const timestamp = Date.now();
-        await this.page.screenshot({ 
-          path: `error_tiktok_post_${timestamp}.png`,
-          fullPage: true 
-        });
-      }
+      // 오류 시 스크린샷 저장 - 제거됨
       
       return null;
     }
@@ -134,10 +127,7 @@ class TikTokPostScraper {
       console.log('댓글:', debugInfo.comment);
       console.log('공유:', debugInfo.share);
       console.log('북마크:', debugInfo.bookmark);
-      await this.page.screenshot({ 
-        path: `debug_post_page_${Date.now()}.png`,
-        fullPage: true 
-      });
+      // 디버그 스크린샷 제거됨
     } catch (error) {
       console.error('디버깅 중 오류:', error.message);
     }
