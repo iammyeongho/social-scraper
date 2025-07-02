@@ -107,15 +107,8 @@ class DatabaseService {
           post_id BIGINT NOT NULL,
           comment_id VARCHAR(255) UNIQUE,
           parent_comment_id BIGINT,
-          author_username VARCHAR(255),
-          author_display_name VARCHAR(255),
-          author_verified BOOLEAN DEFAULT FALSE,
-          comment_text TEXT,
-          like_count BIGINT DEFAULT 0,
-          reply_count INTEGER DEFAULT 0,
-          comment_date TIMESTAMP,
-          scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          raw_data JSONB,
+          user_name VARCHAR(255),
+          display_name VARCHAR(255),
           FOREIGN KEY (post_id) REFERENCES tiktok_post(id) ON DELETE CASCADE,
           FOREIGN KEY (parent_comment_id) REFERENCES tiktok_comments(id) ON DELETE SET NULL
       );
@@ -307,9 +300,7 @@ class DatabaseService {
 
       -- 댓글 인덱스
       CREATE INDEX IF NOT EXISTS idx_tiktok_comments_post_id ON tiktok_comments(post_id);
-      CREATE INDEX IF NOT EXISTS idx_tiktok_comments_author ON tiktok_comments(author_username);
-      CREATE INDEX IF NOT EXISTS idx_tiktok_comments_date ON tiktok_comments(comment_date DESC);
-
+      CREATE INDEX IF NOT EXISTS idx_tiktok_comments_user ON tiktok_comments(user_name);
       -- 팔로워 인덱스
       CREATE INDEX IF NOT EXISTS idx_tiktok_followers_influencer_id ON tiktok_followers(influencer_id);
       CREATE INDEX IF NOT EXISTS idx_tiktok_followers_username ON tiktok_followers(follower_username);
@@ -588,8 +579,22 @@ class DatabaseService {
    */
   async savePost(profileId, postData) {
     const client = await this.pool.connect();
-    
     try {
+      // 3개월 초과 게시물은 저장하지 않고, 기존에 있으면 삭제
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+      if (postData.upload_date && new Date(postData.upload_date) < threeMonthsAgo) {
+        const postId = postData.post_id || this.extractPostIdFromUrl(postData.post_url);
+        if (postId) {
+          await client.query(
+            'DELETE FROM tiktok_post WHERE influencer_id = $1 AND post_id = $2',
+            [profileId, postId]
+          );
+          console.log(`🗑️ 3개월 초과 게시물 삭제: influencer_id=${profileId}, post_id=${postId}`);
+        }
+        return null;
+      }
+      
       console.log(`📝 게시물 저장: ${postData.post_url}`);
       
       // URL 정규화
@@ -641,7 +646,7 @@ class DatabaseService {
         postData.music_title || '',
         postData.music_artist || '',
         postData.effects_used || '',
-        postData.upload_date || new Date(),
+        postData.upload_date !== undefined ? postData.upload_date : null,
         JSON.stringify(postData) // raw_data로 원본 데이터 저장
       ];
 
@@ -786,7 +791,7 @@ class DatabaseService {
   }
 
   /**
-   * TikTok 댓글 데이터 저장
+   * TikTok 댓글 데이터 저장 (배치 처리로 성능 최적화)
    */
   async saveCommentsData(profileId, commentsData) {
     try {
@@ -804,24 +809,9 @@ class DatabaseService {
       }
       
       const postId = postQuery.rows[0].id;
-      let savedCount = 0;
       
-      // 모든 댓글 저장 (메인 댓글 + 답글) - 최소 정보만
-      for (const comment of commentsData.allComments || []) {
-        try {
-          // 기존 댓글 데이터를 최소 형태로 변환
-          const minimalComment = {
-            post_url: commentsData.post_url,
-            influencer_id: profileId,
-            author_username: comment.author || comment.username || comment.author_username || ''
-          };
-          
-          await this.saveComment(minimalComment);
-          savedCount++;
-        } catch (error) {
-          console.error(`댓글 저장 실패:`, error.message);
-        }
-      }
+      // 배치로 모든 댓글 저장 (성능 최적화)
+      const savedCount = await this.saveCommentsBatch(postId, commentsData.allComments || []);
       
       console.log(`✅ 댓글 저장 완료: ${savedCount}개 저장됨`);
       return savedCount;
@@ -833,46 +823,95 @@ class DatabaseService {
   }
 
   /**
-   * 개별 댓글 저장 (최소 정보만 - 팔로워 매칭용)
-   * @param {Object} commentData - 댓글 데이터 (post_url, influencer_id, author_username만 필요)
+   * 배치로 댓글 저장 (성능 최적화)
+   * @param {number} postId - 게시물 ID
+   * @param {Array} comments - 댓글 배열
+   * @returns {number} 저장된 댓글 수
+   */
+  async saveCommentsBatch(postId, comments) {
+    if (!comments || comments.length === 0) return 0;
+    
+    const client = await this.pool.connect();
+    
+    try {
+      // 댓글 데이터 준비 (중복 제거)
+      const uniqueAuthors = new Set();
+      const validComments = [];
+      
+      for (const comment of comments) {
+        const userName = comment.author || comment.username || comment.user_name || '';
+        if (userName && !uniqueAuthors.has(userName)) {
+          uniqueAuthors.add(userName);
+          validComments.push({
+            comment_id: `${postId}_${userName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            user_name: userName
+          });
+        }
+      }
+      
+      if (validComments.length === 0) return 0;
+      
+      // 배치 INSERT (중복은 무시)
+      const values = [];
+      const placeholders = [];
+      const currentTime = new Date();
+      
+      validComments.forEach((comment, index) => {
+        const baseIndex = index * 4;
+        placeholders.push(`($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4})`);
+        values.push(postId, comment.comment_id, comment.user_name, currentTime);
+      });
+      
+      const insertSQL = `
+        INSERT INTO tiktok_comments (post_id, comment_id, user_name, scraped_at)
+        VALUES ${placeholders.join(', ')}
+        ON CONFLICT (comment_id) DO NOTHING
+      `;
+      
+      await client.query(insertSQL, values);
+      
+      console.log(`📦 배치 INSERT 완료: ${validComments.length}개 댓글 처리`);
+      return validComments.length;
+      
+    } catch (error) {
+      console.error('배치 댓글 저장 오류:', error.message);
+      return 0;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * 개별 댓글 저장 (단순화된 버전)
+   * @param {Object} commentData - 댓글 데이터 
    * @returns {number|null} 저장된 댓글 ID 또는 null
    */
   async saveComment(commentData) {
     const client = await this.pool.connect();
     
     try {
-      // 스키마에 맞춰 post_id를 먼저 조회해야 함
       const postQuery = await client.query(
         'SELECT id FROM tiktok_post WHERE post_url = $1 AND influencer_id = $2 LIMIT 1',
         [commentData.post_url, commentData.influencer_id]
       );
       
       if (postQuery.rows.length === 0) {
-        console.log(`⚠️ 게시물을 찾을 수 없음: ${commentData.post_url}`);
         return null;
       }
       
       const postId = postQuery.rows[0].id;
+      const commentId = `${postId}_${commentData.user_name}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // 최소 정보만 저장 (팔로워 매칭용)
+      // 단순 INSERT (중복은 무시)
       const insertSQL = `
-        INSERT INTO tiktok_comments (
-          post_id, author_username, scraped_at
-        ) VALUES ($1, $2, $3)
-        ON CONFLICT (post_id, author_username) 
-        DO UPDATE SET 
-          scraped_at = EXCLUDED.scraped_at
+        INSERT INTO tiktok_comments (post_id, comment_id, user_name, scraped_at)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (comment_id) DO NOTHING
         RETURNING id
       `;
       
-      const values = [
-        postId,                     // 어떤 게시물에
-        commentData.author_username, // 누가 댓글 달았는지
-        new Date()                  // 언제 수집했는지
-      ];
-      
-      const result = await client.query(insertSQL, values);
-      return result.rows[0].id;
+      const result = await client.query(insertSQL, [postId, commentId, commentData.user_name, new Date()]);
+      return result.rows.length > 0 ? result.rows[0].id : null;
       
     } catch (error) {
       console.error('댓글 저장 오류:', error.message);
@@ -908,7 +947,7 @@ class DatabaseService {
       const query = `
         SELECT id 
         FROM tiktok_comments 
-        WHERE post_id = $1 AND author_username = $2
+        WHERE post_id = $1 AND user_name = $2
         LIMIT 1
       `;
       
@@ -1212,6 +1251,75 @@ class DatabaseService {
       await client.query('ROLLBACK');
       console.error('해시태그 저장 오류:', error.message);
       return 0;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * 스크래핑 시작 로그 저장 (scraping_logs)
+   * @param {Object} logData - { task_type, target_type, target_id, status, notes, raw_config }
+   * @returns {number} 저장된 로그 ID
+   */
+  async saveScrapingLogStart(logData) {
+    const client = await this.pool.connect();
+    try {
+      const insertSQL = `
+        INSERT INTO scraping_logs (
+          task_type, target_type, target_id, status, notes, raw_config, start_time
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        RETURNING id
+      `;
+      const values = [
+        logData.task_type,
+        logData.target_type,
+        logData.target_id,
+        logData.status || 'running',
+        logData.notes || null,
+        logData.raw_config ? JSON.stringify(logData.raw_config) : null
+      ];
+      const result = await client.query(insertSQL, values);
+      return result.rows[0].id;
+    } catch (error) {
+      console.error('스크래핑 시작 로그 저장 오류:', error.message);
+      return null;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * 스크래핑 종료 로그 업데이트 (scraping_logs)
+   * @param {number} logId - 로그 ID
+   * @param {Object} updateData - { status, total_items, processed_items, success_items, failed_items, notes }
+   */
+  async updateScrapingLogEnd(logId, updateData = {}) {
+    const client = await this.pool.connect();
+    try {
+      const updateSQL = `
+        UPDATE scraping_logs SET
+          end_time = NOW(),
+          duration_seconds = EXTRACT(EPOCH FROM (NOW() - start_time)),
+          status = $1,
+          total_items = COALESCE($2, total_items),
+          processed_items = COALESCE($3, processed_items),
+          success_items = COALESCE($4, success_items),
+          failed_items = COALESCE($5, failed_items),
+          notes = COALESCE($6, notes)
+        WHERE id = $7
+      `;
+      const values = [
+        updateData.status || 'completed',
+        updateData.total_items,
+        updateData.processed_items,
+        updateData.success_items,
+        updateData.failed_items,
+        updateData.notes || null,
+        logId
+      ];
+      await client.query(updateSQL, values);
+    } catch (error) {
+      console.error('스크래핑 종료 로그 업데이트 오류:', error.message);
     } finally {
       client.release();
     }

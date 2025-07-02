@@ -16,6 +16,9 @@ class TikTokScrapingSystem {
     
     // 스트림 처리를 위해 데이터베이스 서비스 주입
     this.tiktokScraper.setDatabaseService(this.databaseService);
+
+    // 스크래핑 로그 ID 저장용
+    this.scrapingLogId = null;
   }
 
   /**
@@ -54,6 +57,15 @@ class TikTokScrapingSystem {
    */
   async runScrapingProcess() {
     try {
+      // 스크래핑 시작 로그 기록
+      this.scrapingLogId = await this.databaseService.saveScrapingLogStart({
+        task_type: 'tiktok',
+        target_type: 'all',
+        target_id: null,
+        status: 'running',
+        notes: '전체 TikTok 스크래핑 시작',
+        raw_config: {}
+      });
       console.log('=== TikTok 스크래핑 프로세스 시작 ===');
 
       // 1. 서드파티 API에서 TikTok 인플루언서 ID 목록 받아오기
@@ -64,6 +76,14 @@ class TikTokScrapingSystem {
       
       if (!influencerIds || influencerIds.length === 0) {
         console.log('❌ 처리할 TikTok 인플루언서가 없습니다.');
+        // 스크래핑 종료 로그 기록 (결과 없음)
+        if (this.scrapingLogId) {
+          await this.databaseService.updateScrapingLogEnd(this.scrapingLogId, {
+            status: 'no_data',
+            total_items: 0,
+            notes: '처리할 인플루언서 없음'
+          });
+        }
         return;
       }
       
@@ -82,6 +102,14 @@ class TikTokScrapingSystem {
       
       if (!results || results.length === 0) {
         console.log('TikTok 스크래핑 결과가 없습니다.');
+        // 스크래핑 종료 로그 기록 (결과 없음)
+        if (this.scrapingLogId) {
+          await this.databaseService.updateScrapingLogEnd(this.scrapingLogId, {
+            status: 'no_result',
+            total_items: 0,
+            notes: '스크래핑 결과 없음'
+          });
+        }
         return;
       }
       
@@ -162,8 +190,23 @@ class TikTokScrapingSystem {
       // 6. 결과 요약
       this.printSummary(results, saveResults);
 
+      // 스크래핑 종료 로그 기록 (정상 완료)
+      if (this.scrapingLogId) {
+        await this.databaseService.updateScrapingLogEnd(this.scrapingLogId, {
+          status: 'completed',
+          total_items: results.length,
+          notes: '전체 TikTok 스크래핑 정상 종료'
+        });
+      }
     } catch (error) {
       console.error('TikTok 스크래핑 프로세스 오류:', error.message);
+      // 스크래핑 종료 로그 기록 (에러)
+      if (this.scrapingLogId) {
+        await this.databaseService.updateScrapingLogEnd(this.scrapingLogId, {
+          status: 'error',
+          notes: `에러: ${error.message}`
+        });
+      }
     }
   }
 
