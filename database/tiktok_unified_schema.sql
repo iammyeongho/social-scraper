@@ -86,8 +86,8 @@ CREATE TABLE tiktok_comments (
     post_id BIGINT NOT NULL,
     comment_id VARCHAR(255) UNIQUE,
     parent_comment_id BIGINT,
-    author_username VARCHAR(255),
-    author_display_name VARCHAR(255),
+    user_name VARCHAR(255),
+    display_name VARCHAR(255),
     author_verified BOOLEAN DEFAULT FALSE,
     comment_text TEXT,
     like_count BIGINT DEFAULT 0,
@@ -286,7 +286,7 @@ CREATE INDEX idx_tiktok_post_scraped_at ON tiktok_post(scraped_at DESC);
 
 -- 댓글 인덱스
 CREATE INDEX idx_tiktok_comments_post_id ON tiktok_comments(post_id);
-CREATE INDEX idx_tiktok_comments_author ON tiktok_comments(author_username);
+CREATE INDEX idx_tiktok_comments_user ON tiktok_comments(user_name);
 CREATE INDEX idx_tiktok_comments_date ON tiktok_comments(comment_date DESC);
 
 -- 팔로워 인덱스
