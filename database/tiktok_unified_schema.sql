@@ -90,6 +90,7 @@ CREATE TABLE tiktok_comments (
     display_name VARCHAR(255),
     author_verified BOOLEAN DEFAULT FALSE,
     comment_text TEXT,
+    count BIGINT DEFAULT 0,
     like_count BIGINT DEFAULT 0,
     reply_count INTEGER DEFAULT 0,
     comment_date TIMESTAMP,
