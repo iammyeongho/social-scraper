@@ -1,0 +1,38 @@
+[
+  {
+    "tiktok_id": "charlidamelio",
+    "profile_url": "https://www.tiktok.com/@charlidamelio",
+    "scraped_at": "2025-07-04T11:43:10.317165",
+    "tiktok_name": "charlidamelio",
+    "display_name": "charli d’amelio",
+    "description": "",
+    "avatar_url": "",
+    "following": 1311,
+    "followers": 156600000,
+    "hearts": 11900000000,
+    "videos": 0,
+    "is_verified": false,
+    "category": "",
+    "country": "",
+    "engage_rate": 7598.98,
+    "raw_data": {}
+  },
+  {
+    "tiktok_id": "bellapoarch",
+    "profile_url": "https://www.tiktok.com/@bellapoarch",
+    "scraped_at": "2025-07-04T11:43:24.932002",
+    "tiktok_name": "bellapoarch",
+    "display_name": "Bella Poarch",
+    "description": "",
+    "avatar_url": "",
+    "following": 649,
+    "followers": 93600000,
+    "hearts": 2400000000,
+    "videos": 0,
+    "is_verified": false,
+    "category": "",
+    "country": "",
+    "engage_rate": 2564.1,
+    "raw_data": {}
+  }
+]

@@ -1,7 +1,7 @@
 // 틱톡 스크래핑 설정
 module.exports = {
 	// 브라우저 설정
-	headless: true, // 디버깅을 위해 false로 변경
+	headless: false, // 디버깅을 위해 false로 변경
 	timeout: 60000, // 타임아웃을 60초로 증가
 	pageLoadDelay: 500, // 페이지 로딩 대기시간
 	

@@ -37,7 +37,6 @@ class ApiClient {
 			} else {
 				// 테스트용 실제 인플루언서 아이디 (공개 계정들)
 				const testInfluencerIds = [
-					'y_ssuh_',
 					'at_chaeunwoo',
 				];
 
