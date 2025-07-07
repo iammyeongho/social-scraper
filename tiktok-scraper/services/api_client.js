@@ -37,7 +37,7 @@ class ApiClient {
 			} else {
 				// 테스트용 실제 인플루언서 아이디 (공개 계정들)
 				const testInfluencerIds = [
-					'at_chaeunwoo',
+					'wwncom',
 				];
 
 				console.log(`${testInfluencerIds.length}개의 TikTok 인플루언서 ID를 받았습니다. (테스트 데이터)`);

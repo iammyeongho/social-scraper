@@ -1,7 +1,7 @@
 // 틱톡 스크래핑 설정
 module.exports = {
 	// 브라우저 설정
-	headless: false, // 디버깅을 위해 false로 변경
+	headless: 'new', // 디버깅을 위해 false로 변경
 	timeout: 60000, // 타임아웃을 60초로 증가
 	pageLoadDelay: 500, // 페이지 로딩 대기시간
 	
@@ -134,10 +134,10 @@ module.exports = {
 	
 	// 스크래핑 설정
 	scraping: {
-		enableProfileScraping: true, // 프로필 스크래핑
-		enablePostDetailScraping: true, // 게시물 상세 스크래핑 
-		enableCommentScraping: true, // 댓글 스트림 스크래핑
-		enableFollowerScraping: false, // 팔로워 스크래핑
+		enableProfileScraping: false, // 프로필 스크래핑
+		enablePostDetailScraping: false, // 게시물 상세 스크래핑 
+		enableCommentScraping: false, // 댓글 스트림 스크래핑
+		enableFollowerScraping: true, // 팔로워 스크래핑
 		
 		// 수집 제한
 		maxPostsPerProfile: 100, // 프로필당 최대 게시물 수

@@ -104,11 +104,6 @@ class TikTokCommentScraper {
 		this.currentPostUrl = postUrl;
 		this.savedCommentsCount = 0;
 		
-		// 기본 제한값 설정
-		if (!maxComments) {
-			maxComments = 500; // 기본 제한값 (테스트용)
-		}
-		
 		const startTime = new Date();
 		const startTimestamp = Date.now();
 		
@@ -197,9 +192,6 @@ class TikTokCommentScraper {
 	 */
 	async scrapeComments(postUrl, maxComments = null) {
 		// 기본 제한값 설정 (null이면 기본값 사용)
-		if (!maxComments) {
-			maxComments = 500; // 기본 제한값
-		}
 		const startTime = new Date();
 		const startTimestamp = Date.now();
 		
@@ -485,124 +477,51 @@ class TikTokCommentScraper {
 	}
 
 	/**
-	 * 답글 더보기 버튼들 클릭 (강화된 버전)
+	 * 답글 더보기 버튼들 클릭 (DOM 전체 반복 탐색/클릭, 더 이상 없을 때만 스크롤)
 	 */
 	async clickViewMoreButtons() {
-		try {
-			let totalClicked = 0;
-			
-			for (let attempt = 0; attempt < 5; attempt++) { // 답글 더보기 버튼 클릭 시도 증가
-				console.log(`시도 ${attempt + 1}/5 - 답글 더보기 버튼 찾는 중...`);
-				
-				// 먼저 페이지를 다시 스크롤해서 새로운 버튼들 로드
-				await this.page.evaluate(() => {
-					// 더 적극적인 스크롤
-					window.scrollBy(0, window.innerHeight / 2);
-					// 잠깐 기다렸다가 위로도 스크롤
-					setTimeout(() => {
-						window.scrollBy(0, -window.innerHeight / 4);
-					}, 1000);
-				});
-				await this.delay(3000);
-				
+		let totalClicked = 0;
+		let scrollAttempts = 0;
+		const maxScrollAttempts = 30;
+		const maxTotalTime = 60000;
+		const startTime = Date.now();
+
+		while (true) {
+			let clickedAny = false;
+
+			// 1. DOM 전체에서 "답글 더보기" 버튼을 모두 탐색/클릭
+			while (true) {
 				const clicked = await this.page.evaluate(() => {
 					let clickCount = 0;
-					
-					// 더 다양한 셀렉터로 답글 더보기 버튼 찾기 (강화)
-					const selectors = [
-						'div.css-1idgi02-DivViewRepliesContainer',
-						'[class*="ViewReplies"]',
-						'[data-e2e*="view-replies"]',
-						'div[role="button"]',
-						'[class*="view-replies"]',
-						'[class*="ViewMore"]',
-						'[class*="more-replies"]',
-						'span[class*="view"]',
-						'div[class*="replies"]',
-						'[class*="DivViewReplies"]'
-					];
-					
-					const allButtons = [];
-					selectors.forEach(selector => {
-						const buttons = document.querySelectorAll(selector);
-						buttons.forEach(btn => allButtons.push(btn));
+					const buttons = Array.from(document.querySelectorAll('div.css-1idgi02-DivViewRepliesContainer, [class*="ViewReplies"], [data-e2e*="view-replies"]'))
+						.filter(btn => btn.innerText && btn.innerText.match(/View \\d+ replies/));
+					buttons.forEach(btn => {
+						btn.click();
+						clickCount++;
 					});
-					
-					// 중복 제거
-					const uniqueButtons = [...new Set(allButtons)];
-					
-					uniqueButtons.forEach(button => {
-						try {
-							const text = button.textContent || button.innerText || '';
-							const lowerText = text.toLowerCase();
-							
-							// 더 유연한 패턴 매칭
-							const isViewMoreButton = (
-								(lowerText.includes('view') && (lowerText.includes('replies') || lowerText.includes('more'))) ||
-								(lowerText.includes('답글') && lowerText.includes('보기')) ||
-								lowerText.includes('view') && /\d+/.test(lowerText) ||
-								/view\s*\d+/.test(lowerText)
-							) && !lowerText.includes('hide') && !lowerText.includes('숨기');
-							
-							if (isViewMoreButton) {
-								// 버튼이 화면에 보이는지 확인
-								const rect = button.getBoundingClientRect();
-								const isVisible = rect.top >= 0 && rect.top <= window.innerHeight;
-								
-								if (isVisible) {
-									// 버튼을 중앙으로 스크롤
-									button.scrollIntoView({ behavior: 'smooth', block: 'center' });
-									
-									// 잠깐 기다린 후 클릭
-									setTimeout(() => {
-										try {
-											button.click();
-											console.log(`답글 더보기 버튼 클릭: "${text.trim()}"`);
-										} catch (e) {
-											console.log(`버튼 클릭 실패: ${e.message}`);
-										}
-									}, 500);
-									
-									clickCount++;
-								}
-							}
-						} catch (e) {
-							console.log(`버튼 처리 실패: ${e.message}`);
-						}
-					});
-					
 					return clickCount;
 				});
-				
-				if (clicked === 0) {
-					// 한 번 더 스크롤해서 확인
-					await this.page.evaluate(() => {
-						window.scrollBy(0, window.innerHeight);
-					});
-					await this.delay(3000);
-					
-					const secondCheck = await this.page.evaluate(() => {
-						const buttons = document.querySelectorAll('div.css-1idgi02-DivViewRepliesContainer, [class*="ViewReplies"]');
-						return buttons.length;
-					});
-					
-					if (secondCheck === 0) {
-						console.log(`더 이상 클릭할 답글 더보기 버튼이 없습니다.`);
-						break;
-					}
-				} else {
-					console.log(`${clicked}개 답글 더보기 버튼 클릭됨`);
+
+				if (clicked > 0) {
+					clickedAny = true;
 					totalClicked += clicked;
+					await this.delay(800); // 버튼 클릭 후 DOM 갱신 대기
+				} else {
+					break; // 더 이상 클릭할 버튼 없음
 				}
-				
-				// 클릭 후 답글 로딩 대기
-				await this.delay(3000); // 답글 로딩을 위한 충분한 대기
 			}
-			
-			console.log(`총 ${totalClicked}개 답글 더보기 버튼 클릭됨`);
-		} catch (error) {
-			console.log('버튼 클릭 중 오류:', error.message);
+
+			// 2. 더 이상 클릭할 버튼이 없으면 스크롤을 조금 내림
+			if (!clickedAny) {
+				scrollAttempts++;
+				if (scrollAttempts > maxScrollAttempts || Date.now() - startTime > maxTotalTime) break;
+				await this.page.evaluate(() => window.scrollBy(0, 400));
+				await this.delay(500);
+			} else {
+				scrollAttempts = 0; // 클릭이 발생하면 스크롤 시도 초기화
+			}
 		}
+		return totalClicked;
 	}
 
 	/**
@@ -975,7 +894,7 @@ class TikTokCommentScraper {
 			
 			console.log(`실시간 스트림 목표: ${maxComments}개 댓글`);
 			
-			while (this.savedCommentsCount < maxComments && scrollAttempts < maxScrollAttempts) {
+			while ((maxComments === null || this.savedCommentsCount < maxComments) && scrollAttempts < maxScrollAttempts) {
 				const cycleStart = Date.now();
 				
 				// 1단계: 현재 보이는 댓글들 즉시 저장
@@ -1260,7 +1179,7 @@ class TikTokCommentScraper {
 				
 				const commentKey = `${comment.user_name}_${comment.text.substring(0, 50)}_${comment.type}`;
 				
-				if (!processedComments.has(commentKey)) {
+				// if (!processedComments.has(commentKey)) {
 					processedComments.add(commentKey);
 					
 					// 즉시 데이터베이스에 저장
@@ -1274,7 +1193,7 @@ class TikTokCommentScraper {
 							console.log(` 실시간: ${comment.type} "${comment.text.substring(0, 30)}..." by @${comment.user_name}`);
 						}
 					}
-				}
+				// }
 			}
 			
 			return savedCount;

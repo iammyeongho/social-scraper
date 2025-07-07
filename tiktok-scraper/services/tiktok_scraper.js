@@ -347,7 +347,7 @@ class TikTokScraper {
 				await this.initializeScrapers();
 				
 						// 댓글 수집 (설정값 사용)
-				const maxComments = config.scraping.maxCommentsPerPost || 500;
+				const maxComments = config.scraping.maxCommentsPerPost;
 				const commentResult = await this.commentScraper.scrapeComments(postUrl, maxComments);
 				
 				if (commentResult && commentResult.total > 0) {
@@ -864,7 +864,7 @@ class TikTokScraper {
 				console.log(`시작 시간: ${postStartTime.toLocaleString('ko-KR')}`);
 				
 				// 댓글 수집 (설정값 사용)
-				const maxComments = config.scraping.maxCommentsPerPost || 500;
+				const maxComments = config.scraping.maxCommentsPerPost;
 				
 				// 스트림 방식 댓글 수집 (실시간 저장)
 				const streamResult = await this.commentScraper.scrapeCommentsStream(postUrl, profileId, maxComments);
