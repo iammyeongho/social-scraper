@@ -1,15 +1,27 @@
+const path = require('path');
+
 module.exports = {
-  // 브라우저 설정
+  // 크롬 프로필 경로 통일
+  chromeProfilePath: path.resolve(__dirname, '../chrome-profile'),
+
+  // 브라우저 설정 (세션 유지용)
   browser: {
     headless: false,
     defaultViewport: null,
+    userDataDir: path.resolve(__dirname, '../chrome-profile'), // 로그인 세션 저장
     args: [
       '--window-size=390,844',
       '--lang=ko-KR,ko',
       '--disable-blink-features=AutomationControlled',
-      '--incognito',  // 시크릿 모드 활성화 (게시물 스크래핑용)
       '--disable-web-security',
       '--disable-features=VizDisplayCompositor',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--disable-gpu',
     ],
   },
 
@@ -17,13 +29,20 @@ module.exports = {
   loggedInBrowser: {
     headless: false,
     defaultViewport: null,
-    userDataDir: './user_data', // 로그인 세션 저장
+    userDataDir: path.resolve(__dirname, '../chrome-profile'), // 로그인 세션 저장
     args: [
       '--window-size=390,844',
       '--lang=ko-KR,ko',
       '--disable-blink-features=AutomationControlled',
       '--disable-web-security',
       '--disable-features=VizDisplayCompositor',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--disable-gpu',
     ],
   },
 

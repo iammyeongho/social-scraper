@@ -9,6 +9,7 @@ Instagram 인플루언서 데이터 수집 시스템
 - PostgreSQL 데이터베이스 저장
 - 서드파티 API 연동
 - AWS 클라우드 배포 지원
+- **로그인 세션 자동 유지**
 
 ## 설치
 
@@ -63,7 +64,50 @@ npm run post
 
 # 로그인 테스트
 npm run login
+
+# 세션 유지 (새로 추가)
+npm run session
 ```
+
+## 로그인 세션 유지
+
+인스타그램은 보안상 주기적으로 로그아웃을 시키는 경우가 있습니다. 이를 방지하기 위해 세션 유지 기능을 제공합니다.
+
+### 세션 유지 방법
+
+1. **자동 세션 유지 스케줄러 실행**
+   ```bash
+   npm run session
+   ```
+   - 30분마다 세션을 갱신합니다
+   - 5분마다 활동을 수행하여 세션을 활성화합니다
+
+2. **수동 로그인**
+   ```bash
+   npm run login
+   ```
+   - 브라우저가 열리면 수동으로 로그인
+   - 로그인 후 Enter를 눌러 세션 확인
+
+3. **환경변수 설정 (자동 로그인용)**
+   ```bash
+   # .env 파일에 추가
+   INSTAGRAM_USERNAME=your_username
+   INSTAGRAM_PASSWORD=your_password
+   ```
+
+### 크롬 프로필 사용
+
+- 모든 스크래핑 작업은 `chrome-profile` 디렉토리의 크롬 프로필을 사용합니다
+- 로그인 세션, 쿠키, 캐시 등이 자동으로 저장됩니다
+- 프로필 경로: `instagram-scraper/chrome-profile/`
+
+### 세션 유지 팁
+
+1. **정기적인 활동**: 주기적으로 인스타그램에 접속하여 활동을 수행
+2. **안전한 브라우징**: 의심스러운 링크나 사이트 방문을 피함
+3. **2단계 인증**: 계정 보안을 위해 2단계 인증 활성화 권장
+4. **프로필 백업**: 중요한 경우 `chrome-profile` 디렉토리를 백업
 
 ## 설정
 
@@ -92,6 +136,8 @@ instagram-scraper/
 ├── scrapers/         # 스크래핑 모듈들
 ├── services/         # 핵심 서비스들
 ├── scripts/          # 유틸리티 스크립트들
+│   └── session_keeper.js  # 세션 유지 스케줄러
+├── chrome-profile/   # 크롬 프로필 (세션 저장)
 ├── output/           # 출력 파일들
 ├── logs/             # 로그 파일들
 └── main.js           # 메인 실행 파일

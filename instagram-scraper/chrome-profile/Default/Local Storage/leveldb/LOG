@@ -1,2 +1,3 @@
-2025/07/07-19:26:28.824 470 Creating DB D:\social-scraper\instagram-scraper\chrome-profile\Default\Local Storage\leveldb since it was missing.
-2025/07/07-19:26:28.925 470 Reusing MANIFEST D:\social-scraper\instagram-scraper\chrome-profile\Default\Local Storage\leveldb/MANIFEST-000001
+2025/07/08-09:10:05.776 5898 Reusing MANIFEST D:\social-scraper\instagram-scraper\chrome-profile\Default\Local Storage\leveldb/MANIFEST-000001
+2025/07/08-09:10:05.782 5898 Recovering log #3
+2025/07/08-09:10:05.793 5898 Reusing old log D:\social-scraper\instagram-scraper\chrome-profile\Default\Local Storage\leveldb/000003.log 

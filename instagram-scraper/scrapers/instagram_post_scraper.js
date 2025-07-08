@@ -1,14 +1,17 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const { setTimeout: sleep } = require('node:timers/promises');
-const config = require('../config').instagram;
+const config = require('../config/instagram');
 
 puppeteer.use(StealthPlugin());
 
 const postUrls = config.testUrls;
 
 (async () => {
-  const browser = await puppeteer.launch(config.browser);
+  const browser = await puppeteer.launch({
+    ...config.browser,
+    userDataDir: config.chromeProfilePath, // 크롬 프로필 사용
+  });
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844 });
 

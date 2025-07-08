@@ -3,10 +3,11 @@ const qs = require('qs');
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const path = require('path');
+const config = require('../config/instagram');
 puppeteer.use(StealthPlugin());
 
 // =====================[ 사용자 입력: 아래 값만 수정 ]====================
-const USER_DATA_DIR = path.resolve(__dirname, '../chrome-profile');
+const USER_DATA_DIR = config.chromeProfilePath;
 const POST_URL = 'https://www.instagram.com/p/DLFh2Zgzmlo/comments/'; // 긁고 싶은 게시물의 /comments/ URL만 입력
 // 네트워크 탭에서 복사한 쿠키 문자열
 const COOKIE = 'datr=3KYhaGRVAvUKXfAYup8M9fM-; ig_did=BB30D391-DC11-403F-8427-BF8874C35D06; mid=aCGm3AALAAFtKJ8MFhGq90en-K9k; ig_nrcb=1; ps_l=1; ps_n=1; ig_lang=ko; csrftoken=D2gfsD411bcivMKBHvT00CQGLyHmZfcb; ds_user_id=75894083378; sessionid=75894083378%3ACBVyldpaRNJdiV%3A26%3AAYc4Sg1to8UojGuIcgRTnT1VLLvyaebVIxRnRgxkWw; wd=1258x944; rur="CCO\x2c75894083378\x2c1783409955:01feaaea1ee57d1bf994dc39b7cdb136e77b8f3831aefadeb4ef29a1d9080436b6a275f1"';
